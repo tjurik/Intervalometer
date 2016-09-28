@@ -5,6 +5,10 @@ Arduino based Intervalometer project.  There are a number of projects on the int
 
 Original code is for Arduino Uno, but will eventually allow for compiling against other chips.  (Adafruit Feather for example)  
 
+Development environment
+
+- Visual Studio 2015 with Visual Micro (Arduino IDE V 1.6)
+
 Requirements
 
 - Set interval between shutter/photo capture
