@@ -9,6 +9,10 @@ Development environment
 
 - Visual Studio 2015 with Visual Micro (Arduino IDE V 1.6)
 
+Libraries
+
+- RTClib - You need to get the RTCLib library (https://github.com/adafruit/RTClib)
+
 Requirements
 
 - Set interval between shutter/photo capture
