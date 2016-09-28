@@ -1,4 +1,5 @@
-# Invervalometer-ATmega328P
+# Invervalometer
+(current only works for ATmega328P)
 Arduino based intervalometer for time lapse photography
 
 Arduino based Intervalometer project.  There are a number of projects on the internets that provide this functionality but I wanted to add settings tor days and time periods in addition to a more traditional time lapse interval.
