@@ -1,4 +1,7 @@
-#include <RTClib.h>  
+#include <RTClib.h>				// a real time clock lib
+
+#include "boards.h"				// identifies the chip/board based on IDE's setting (we use it for logging)
+#include"lib_customization.h"	// edit this file to define the real time clock and any other functionality-controlling parameters
 
 //////////////////////////////////////////////////////////////
 // edit these values to set the interval for taking photos
@@ -71,6 +74,8 @@ void LogEvent(char * str)
 {
 	logTime(now);
 	Serial.print("  ");
+	Serial.print(BOARD);
+	Serial.print("  ");
 	Serial.print(str);
 	Serial.println();
 }
@@ -115,12 +120,15 @@ setupIntervalometerSettings()
 	stop_time = (60 * STOP_HOUR) + STOP_MINUTE;
 }
 
+//#if defined(__AVR_Atmega32U4__) // Yun 16Mhz, Micro, Leonardo, Esplora
+
 void setup()
 {	
 	setupRTClock();
 	setupCameraPins();
 	setupIntervalometerSettings();
-
+	
+	//setup
 	cli();  // stop interrupts
 
 	//set timer1 interrupt at 1Hz
@@ -136,10 +144,7 @@ void setup()
 	// enable timer compare interrupt
 	TIMSK1 |= (1 << OCIE1A);
 
-	sei();//allow interrupts
-
-
-	
+	sei();//allow interrupts	
 	
 	LogEvent("Started");
 }
@@ -222,19 +227,21 @@ ISR(TIMER1_COMPA_vect)
 // Parameter is how long to keep it open/take pic
 void exposure(int duration)
 {
-	// *********TO DO*********
 	// trigger some relay or transistor or optocoupler in the circuit
-
-	// I don't know what order these have to be in (focus then shutter - but do they need delay or same time is ok?)
+	// I think we want focus then shutter - but do they need delay or same time is ok?
 	digitalWrite(focusPin, HIGH);  // do we want a delay between focus and shutter?
-	digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-	digitalWrite(shutterPin, HIGH);
+#ifdef _FLASH_LED_ON_TRIGGER 	
+	digitalWrite(LED_BUILTIN, HIGH); 
+#endif
+	digitalWrite(shutterPin, HIGH);	
 
 	delay(duration);
 
 	digitalWrite(shutterPin, LOW);
-	digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
 	digitalWrite(focusPin, LOW);
+#ifdef _FLASH_LED_ON_TRIGGER
+	digitalWrite(LED_BUILTIN, LOW); 
+#endif
 }
 
 void loop()
