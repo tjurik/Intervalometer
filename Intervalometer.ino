@@ -257,7 +257,7 @@ void exposure(int duration)
 	digitalWrite(LED_BUILTIN, LOW); 
 #endif
 }
-
+ 
 void loop()
 {
 	/*
