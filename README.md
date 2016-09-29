@@ -35,16 +35,29 @@ Current hardware
 
 Optional Hardware
 
-- Real time clock (we're going to use DS3231)
+- Real time clock (planned testing with PCF8523 DS3231 and none)
 - wifi
 - bluetooth
+- SD card/logger
 
 Planned hardware support
 
-- Adafruit Feather
-There is another repo for this for now.  When that code is working Will abandon that repo and merge into this one.  
+- Adafruit Feather M0
 
 Electronics
 
 - It may be possible to use 2N2222 or PN2222 transistors, but I think we will use optocouplers
 - Camera remote controller - for Nikon 5100 it is MC-DC2 
+
+
+Configuration
+
+To set up the code to compile and use the right settings for your board you need to edit the lib_customizaation.h file to set the #defines macros for your real time clock support.  if you don't set this it will default to no RTC and use millis().  
+
+You can control a led indicator with 
+#define _FLASH_LED_ON_TRIGGER
+
+Board/chip support is figured out in the code.  Note however that you may have to add support for the timer function for your board/chipset.  
+
+To add the support you need to create an interrupt/timer callback for 1hz (once per second) and call the 
+commonTimerFunction() method.
