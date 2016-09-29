@@ -3,9 +3,18 @@
 #include "boards.h"				// identifies the chip/board based on IDE's setting (we use it for logging)
 #include"lib_customization.h"	// edit this file to define the real time clock and any other functionality-controlling parameters
 
+// looks like we can use an NPN transistor - no problem
+// use a 10k resistor?
+// nikon pinout http://www.doc-diy.net/photo/remote_pinout/
+// http://www.instructables.com/id/Nikon-D90-MC-DC2-Remote-Shutter-Hack/?ALLSTEPS
+
+
 //////////////////////////////////////////////////////////////
+// GLOBALS
+//
 // edit these values to set the interval for taking photos
 //////////////////////////////////////////////////////////////
+
 int		DELAY				= 0;	// delay from when program is started to when it should start taking photos
 int		SHUTTER_TIME		= 250;	// (in milliseconds) I have no idea what this means.  what is the resolution of this? 
 int		INTERVAL			= 2;	// number of seconds to wait between photos  - for 1 minute use 60, one hour use 3600, etc
@@ -20,13 +29,12 @@ bool	VALID_DAYS[] = {			// true for yes, take photo, false for no - don't take p
 	true
 };
 
-// Set the se to all 0 if you want to take photos at any time, otherwise set the beginning hour and minute to be before the stop hour and minute
-// Hours should be 0 to 23
-// minutes 0 to 59
-int START_HOUR = 0;
-int START_MINUTE = 3;
-int STOP_HOUR = 23;
-int STOP_MINUTE = 58;
+// Set to all 0 if always take photo
+// Otherwise set the beginning hour and minute to be before the stop hour and minute
+int START_HOUR		= 0;	// 0 to 23
+int START_MINUTE	= 3;	// 0 to 59
+int STOP_HOUR		= 23;	// 0 to 23
+int STOP_MINUTE		= 58;	// 0 to 59
 
 //////////////////////////////////////////////////////////////
 // End of user editable settings
@@ -122,22 +130,20 @@ setupIntervalometerSettings()
 
 //#if defined(__AVR_Atmega32U4__) // Yun 16Mhz, Micro, Leonardo, Esplora
 
-void setup()
-{	
-	setupRTClock();
-	setupCameraPins();
-	setupIntervalometerSettings();
-	
-	//setup
+void setupOneHertzTimer()
+{
+	// standard UNO board
+	// copied from examples
+	// generates pulse wave of frequency 1Hz/2 = 0.5kHz (takes two cycles for full wave- toggle high then toggle low)
 	cli();  // stop interrupts
 
-	//set timer1 interrupt at 1Hz
+			//set timer1 interrupt at 1Hz
 	TCCR1A = 0;// set entire TCCR1A register to 0
 	TCCR1B = 0;// same for TCCR1B
 	TCNT1 = 0;//initialize counter value to 0
-	// set compare match register for 1hz increments
+			  // set compare match register for 1hz increments
 	OCR1A = 15624;// = (16*10^6) / (1*1024) - 1 (must be <65536)
-	// turn on CTC mode
+				  // turn on CTC mode
 	TCCR1B |= (1 << WGM12);
 	// Set CS12 and CS10 bits for 1024 prescaler
 	TCCR1B |= (1 << CS12) | (1 << CS10);
@@ -145,8 +151,18 @@ void setup()
 	TIMSK1 |= (1 << OCIE1A);
 
 	sei();//allow interrupts	
+
+}
+
+void setup()
+{	
+	setupRTClock();
+	setupCameraPins();
+	setupIntervalometerSettings();
+	setupOneHertzTimer();
 	
 	LogEvent("Started");
+	LogSettings();
 }
 
 void logTime(DateTime now)
@@ -177,7 +193,7 @@ bool CheckIfWeShouldTakePhoto()
 	if (!VALID_DAYS[dayOfWeek]) {
 		return false;
 	}
-
+		
 	if (start_time != 0 || stop_time != 0)
 	{
 		if (start_time > current_time || current_time >= stop_time)
@@ -217,8 +233,6 @@ void commonTimerFunction()
 	}
 }
 
-//generates pulse wave of frequency 1Hz/2 = 0.5kHz (takes two cycles for full wave- toggle high then toggle low)
-// copied from examples
 ISR(TIMER1_COMPA_vect)
 {
 	commonTimerFunction();
@@ -270,4 +284,39 @@ void loop()
 	}
 	// log the transition - we may not need to do this.
 	// we should email this info if possible?	
+}
+
+void LogSettings()
+{
+	Serial.print("Settings\n");
+	Serial.print("-\tInterval (seconds): ");	Serial.print(INTERVAL, DEC); Serial.println();
+	Serial.print("-\tShutter Time (ms):  ");	Serial.print(SHUTTER_TIME, DEC);	 Serial.println();
+	Serial.print("-\tExposures:          ");		Serial.print(NUMBER_OF_EXPOSURES, DEC); Serial.println();
+	Serial.print("-\tValid Days:         ");
+	for (int d = 0; d < 7; d++)
+	{
+		if (VALID_DAYS[d]) {
+			Serial.print(daysOfTheWeek[d]);	Serial.print(", ");
+		}
+	}
+	Serial.println();
+	Serial.print("-\tValid Period:       ");
+	if (START_HOUR < 10)
+		Serial.print("0");
+	Serial.print(START_HOUR, DEC);
+	Serial.print(":");
+	if (START_MINUTE < 10)
+		Serial.print("0");
+	Serial.print(START_MINUTE, DEC);
+	Serial.print(" to ");
+	if (STOP_HOUR < 10)
+		Serial.print("0");
+	Serial.print(STOP_HOUR, DEC);
+	Serial.print(":");
+	if (STOP_MINUTE < 10)
+		Serial.print("0");
+	Serial.print(STOP_MINUTE, DEC);
+	Serial.println();
+	Serial.print("-\tFocus Pin:          ");	Serial.print(focusPin, DEC); Serial.println();
+	Serial.print("-\tShutter Pin:        ");	Serial.print(shutterPin, DEC);	Serial.println();
 }
