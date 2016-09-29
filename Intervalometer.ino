@@ -218,7 +218,7 @@ ISR(TIMER1_COMPA_vect)
 {
 	commonTimerFunction();
 }
-
+ 
 // Parameter is how long to keep it open/take pic
 void exposure(int duration)
 {
