@@ -16,7 +16,7 @@
 //////////////////////////////////////////////////////////////
 
 int		DELAY				= 0;	// delay from when program is started to when it should start taking photos
-int		SHUTTER_TIME		= 250;	// (in milliseconds) I have no idea what this means.  what is the resolution of this? 
+int		SHUTTER_TIME		= 155;	// (in milliseconds) I have no idea what this means.  what is the resolution of this? 
 int		INTERVAL			= 2;	// number of seconds to wait between photos  - for 1 minute use 60, one hour use 3600, etc
 int		NUMBER_OF_EXPOSURES = 1;	// number of photos to take for each 'loop'/command to take a photo
 bool	VALID_DAYS[] = {			// true for yes, take photo, false for no - don't take photo
@@ -122,7 +122,7 @@ void setupCameraPins()
 	digitalWrite(shutterPin, LOW);
 }
 
-setupIntervalometerSettings()
+void setupIntervalometerSettings()
 {
 	start_time = (60 * START_HOUR) + START_MINUTE;
 	stop_time = (60 * STOP_HOUR) + STOP_MINUTE;
@@ -132,26 +132,11 @@ setupIntervalometerSettings()
 
 void setupOneHertzTimer()
 {
-	// standard UNO board
-	// copied from examples
-	// generates pulse wave of frequency 1Hz/2 = 0.5kHz (takes two cycles for full wave- toggle high then toggle low)
-	cli();  // stop interrupts
+	// Add specific boards/chips here
+	// to keep this part clean we ifdef the code in the function - so no ifdefs in this method
 
-			//set timer1 interrupt at 1Hz
-	TCCR1A = 0;// set entire TCCR1A register to 0
-	TCCR1B = 0;// same for TCCR1B
-	TCNT1 = 0;//initialize counter value to 0
-			  // set compare match register for 1hz increments
-	OCR1A = 15624;// = (16*10^6) / (1*1024) - 1 (must be <65536)
-				  // turn on CTC mode
-	TCCR1B |= (1 << WGM12);
-	// Set CS12 and CS10 bits for 1024 prescaler
-	TCCR1B |= (1 << CS12) | (1 << CS10);
-	// enable timer compare interrupt
-	TIMSK1 |= (1 << OCIE1A);
-
-	sei();//allow interrupts	
-
+	setupAtmega328();		// Uno
+	setupZero();			// Adafruit Feather M0
 }
 
 void setup()
@@ -159,8 +144,7 @@ void setup()
 	setupRTClock();
 	setupCameraPins();
 	setupIntervalometerSettings();
-	setupOneHertzTimer();
-	
+	setupOneHertzTimer();	
 	LogEvent("Started");
 	LogSettings();
 }
@@ -205,7 +189,6 @@ bool CheckIfWeShouldTakePhoto()
 	return true;
 }
 
-
 void commonTimerFunction()
 {
 	/*
@@ -233,11 +216,6 @@ void commonTimerFunction()
 	}
 }
 
-ISR(TIMER1_COMPA_vect)
-{
-	commonTimerFunction();
-}
- 
 // Parameter is how long to keep it open/take pic
 void exposure(int duration)
 {
@@ -261,7 +239,6 @@ void exposure(int duration)
 void loop()
 {
 	/*
-	have a listener for getting new data?
 	Configuration:
 	--------------
 	- delay - before it starts running (optional?)
@@ -283,7 +260,7 @@ void loop()
 		triggerPhoto = false;
 	}
 	// log the transition - we may not need to do this.
-	// we should email this info if possible?	
+	// we should email this info if possible?		 
 }
 
 void LogSettings()
@@ -319,4 +296,113 @@ void LogSettings()
 	Serial.println();
 	Serial.print("-\tFocus Pin:          ");	Serial.print(focusPin, DEC); Serial.println();
 	Serial.print("-\tShutter Pin:        ");	Serial.print(shutterPin, DEC);	Serial.println();
+}
+
+
+/*
+The code puts timer TC4 into match frequency (MFRQ) mode. In this mode the timer counts up to the value in the CC0 register before overflowing and resetting the timer back to 0.
+I've set the generic clock 4 (GCLK4) to 48MHz and the timer prescaler to 1024. Therefore the timer's being clocked at 46.875kHz.
+Using the formula:
+timer frequency = generic clock frequency / (N * (CC0 + 1))
+where:
+N = timer prescaler
+CC0 = value in the CC0 register
+
+...we can calculate CC0 for a timer frequency of 1Hz.
+
+So,
+CC0 = (48MHz / 1024) - 1 = 46874 = 0xB71A (hex)
+This will cause the timer to overflow every second.
+*/
+
+// Set timer TC4 to call the TC4_Handler every second
+void setupZero()
+{
+#ifdef ARDUINO_SAMD_FEATHER_M0
+	// Set up the generic clock (GCLK4) used to clock timers
+	REG_GCLK_GENDIV = GCLK_GENDIV_DIV(1) |          // Divide the 48MHz clock source by divisor 1: 48MHz/1=48MHz
+		GCLK_GENDIV_ID(4);            // Select Generic Clock (GCLK) 4
+	while (GCLK->STATUS.bit.SYNCBUSY);              // Wait for synchronization
+
+	REG_GCLK_GENCTRL = GCLK_GENCTRL_IDC |           // Set the duty cycle to 50/50 HIGH/LOW
+		GCLK_GENCTRL_GENEN |         // Enable GCLK4
+		GCLK_GENCTRL_SRC_DFLL48M |   // Set the 48MHz clock source
+		GCLK_GENCTRL_ID(4);          // Select GCLK4
+	while (GCLK->STATUS.bit.SYNCBUSY);              // Wait for synchronization
+
+													// Feed GCLK4 to TC4 and TC5
+	REG_GCLK_CLKCTRL = GCLK_CLKCTRL_CLKEN |         // Enable GCLK4 to TC4 and TC5
+		GCLK_CLKCTRL_GEN_GCLK4 |     // Select GCLK4
+		GCLK_CLKCTRL_ID_TC4_TC5;     // Feed the GCLK4 to TC4 and TC5
+	while (GCLK->STATUS.bit.SYNCBUSY);              // Wait for synchronization
+
+	REG_TC4_COUNT16_CC0 = 0xB71A;                   // Set the TC4 CC0 register as the TOP value in match frequency mode
+	while (TC4->COUNT16.STATUS.bit.SYNCBUSY);       // Wait for synchronization
+
+													//NVIC_DisableIRQ(TC4_IRQn);
+													//NVIC_ClearPendingIRQ(TC4_IRQn);
+	NVIC_SetPriority(TC4_IRQn, 0);    // Set the Nested Vector Interrupt Controller (NVIC) priority for TC4 to 0 (highest)
+	NVIC_EnableIRQ(TC4_IRQn);         // Connect TC4 to Nested Vector Interrupt Controller (NVIC)
+
+	REG_TC4_INTFLAG |= TC_INTFLAG_OVF;              // Clear the interrupt flags
+	REG_TC4_INTENSET = TC_INTENSET_OVF;             // Enable TC4 interrupts
+													// REG_TC4_INTENCLR = TC_INTENCLR_OVF;          // Disable TC4 interrupts
+
+	REG_TC4_CTRLA |= TC_CTRLA_PRESCALER_DIV1024 |   // Set prescaler to 1024, 48MHz/1024 = 46.875kHz
+		TC_CTRLA_WAVEGEN_MFRQ |        // Put the timer TC4 into match frequency (MFRQ) mode
+		TC_CTRLA_ENABLE;               // Enable TC4
+	while (TC4->COUNT16.STATUS.bit.SYNCBUSY);       // Wait for synchronization
+
+	PORT->Group[g_APinDescription[LED_BUILTIN].ulPort].DIRSET.reg = (uint32_t)(1 << g_APinDescription[LED_BUILTIN].ulPin);
+	PORT->Group[g_APinDescription[LED_BUILTIN].ulPort].OUTSET.reg = (uint32_t)(1 << g_APinDescription[LED_BUILTIN].ulPin);
+#endif
+}
+
+#ifdef ARDUINO_SAMD_FEATHER_M0
+void TC4_Handler()                              // Interrupt Service Routine (ISR) for timer TC4
+{
+	// Check for overflow (OVF) interrupt
+	if (TC4->COUNT16.INTFLAG.bit.OVF && TC4->COUNT16.INTENSET.bit.OVF)
+	{
+		// Put your timer overflow (OVF) code here:     
+		// ...
+		
+		commonTimerFunction();
+		
+		REG_TC4_INTFLAG = TC_INTFLAG_OVF;         // Clear the OVF interrupt flag
+	}
+}
+
+#endif
+
+#ifdef __AVR_ATmega328P__
+ISR(TIMER1_COMPA_vect)
+{
+	// copied from examples
+	// generates pulse wave of frequency 1Hz/2 = 0.5kHz (takes two cycles for full wave- toggle high then toggle low)
+	commonTimerFunction();
+}
+#endif
+
+void setupAtmega328()
+{
+#ifdef __AVR_ATmega328P__
+
+	cli();  // stop interrupts
+
+			//set timer1 interrupt at 1Hz
+	TCCR1A = 0;// set entire TCCR1A register to 0
+	TCCR1B = 0;// same for TCCR1B
+	TCNT1 = 0;//initialize counter value to 0
+			  // set compare match register for 1hz increments
+	OCR1A = 15624;// = (16*10^6) / (1*1024) - 1 (must be <65536)
+				  // turn on CTC mode
+	TCCR1B |= (1 << WGM12);
+	// Set CS12 and CS10 bits for 1024 prescaler
+	TCCR1B |= (1 << CS12) | (1 << CS10);
+	// enable timer compare interrupt
+	TIMSK1 |= (1 << OCIE1A);
+
+	sei();//allow interrupts	
+#endif
 }
