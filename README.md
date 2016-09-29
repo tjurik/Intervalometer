@@ -59,5 +59,5 @@ You can control a led indicator with
 
 Board/chip support is figured out in the code.  Note however that you may have to add support for the timer function for your board/chipset.  
 
-To add the support you need to create an interrupt/timer callback for 1hz (once per second) and call the 
-<pre>commonTimerFunction()</pre> method.
+To add the support you need to create an interrupt/timer callback for 1hz (once per second) and call the method:
+<pre>commonTimerFunction()</pre> 
