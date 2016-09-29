@@ -55,9 +55,9 @@ Configuration
 To set up the code to compile and use the right settings for your board you need to edit the lib_customizaation.h file to set the #defines macros for your real time clock support.  if you don't set this it will default to no RTC and use millis().  
 
 You can control a led indicator with 
-#define _FLASH_LED_ON_TRIGGER
+<pre>#define _FLASH_LED_ON_TRIGGER</pre>
 
 Board/chip support is figured out in the code.  Note however that you may have to add support for the timer function for your board/chipset.  
 
 To add the support you need to create an interrupt/timer callback for 1hz (once per second) and call the 
-commonTimerFunction() method.
+<pre>commonTimerFunction()</pre> method.
