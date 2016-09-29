@@ -3,15 +3,15 @@
 //////////////////////////////////////////////////////////////
 // edit these values to set the interval for taking photos
 //////////////////////////////////////////////////////////////
-int		DELAY = 0;	// delay from when program is started to when it should start taking photos
-int		SHUTTER_TIME = 250;	// (in milliseconds) I have no idea what this means.  what is the resolution of this? 
-int		INTERVAL = 2;	// number of seconds to wait between photos
+int		DELAY				= 0;	// delay from when program is started to when it should start taking photos
+int		SHUTTER_TIME		= 250;	// (in milliseconds) I have no idea what this means.  what is the resolution of this? 
+int		INTERVAL			= 2;	// number of seconds to wait between photos  - for 1 minute use 60, one hour use 3600, etc
 int		NUMBER_OF_EXPOSURES = 1;	// number of photos to take for each 'loop'/command to take a photo
-bool	VALID_DAYS[] = {		// true for yes, take photo, false for no - don't take photo
-	false,  // sunday
+bool	VALID_DAYS[] = {			// true for yes, take photo, false for no - don't take photo
+	false,// sunday
 	true, // monday
-	true, // etc
-	true,
+	true, // tuesday
+	true, // wednesday, etc
 	true,
 	false,
 	true
@@ -53,14 +53,19 @@ int start_time = 0;
 int stop_time = 0;
 int interval_counter = 0;
 
-//RTC_DS3231 rtc;
+
+// set the type of clock - the default is no RTC - but set the macro for the one you are using.
+
+#ifdef _RTC_DS3231_
+RTC_DS3231 rtc; 
+#elif _RTC_DS1307
+RTC_DS1307 rtc;
+#else
 RTC_Millis rtc;
+#endif
 
-boolean toggle1 = 0;   // this is used only for example - can probably remove
-
-					   // this is just for logging
+// this is just for logging
 char daysOfTheWeek[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
-
 
 void LogEvent(char * str)
 {
@@ -74,39 +79,57 @@ void LogEvent(char * str)
 http://playground.arduino.cc/Main/DS1302
 https://learn.adafruit.com/ds1307-real-time-clock-breakout-board-kit/understanding-the-code
 */
-void setup()
+
+void setupRTClock()
 {
-	/*
-	https://learn.adafruit.com/ds1307-real-time-clock-breakout-board-kit/arduino-library
-	*/
-	/* add setup code here */
-
-	// depending on what RTC (if any) you need to call the correct one.
+	// https://learn.adafruit.com/ds1307-real-time-clock-breakout-board-kit/arduino-library
+	// conditional compilation depending on RTC we are using
+#ifdef _RTC_DS3231_	
 	//if (!rtc.begin()) {		
-	//Serial.println("RTC is NOT running!");
-	// following line sets the RTC to the date & time this sketch was compiled
+	//Serial.println("RTC is NOT running!");	
 	//rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-	rtc.begin(DateTime(F(__DATE__), F(__TIME__)));  // use this for the millis - not for the other chip
-													//}
+#elif _RTC_DS1307
 
-													//Serial.begin(9600);
-													// set the focus and shutter pins
+#else
+	rtc.begin(DateTime(F(__DATE__), F(__TIME__)));  // use this for the millis - not for the other chip
+#endif
+
+	// first call to set the time
+	now = rtc.now();
+}
+
+void setupCameraPins()
+{
+	// set the focus and shutter pins
 	pinMode(focusPin, OUTPUT);
 	pinMode(shutterPin, OUTPUT);
 	pinMode(13, OUTPUT);    // just for led - nothing important
 
 	digitalWrite(focusPin, LOW);
 	digitalWrite(shutterPin, LOW);
+}
+
+setupIntervalometerSettings()
+{
+	start_time = (60 * START_HOUR) + START_MINUTE;
+	stop_time = (60 * STOP_HOUR) + STOP_MINUTE;
+}
+
+void setup()
+{	
+	setupRTClock();
+	setupCameraPins();
+	setupIntervalometerSettings();
 
 	cli();  // stop interrupts
 
-			//set timer1 interrupt at 1Hz
+	//set timer1 interrupt at 1Hz
 	TCCR1A = 0;// set entire TCCR1A register to 0
 	TCCR1B = 0;// same for TCCR1B
 	TCNT1 = 0;//initialize counter value to 0
-			  // set compare match register for 1hz increments
+	// set compare match register for 1hz increments
 	OCR1A = 15624;// = (16*10^6) / (1*1024) - 1 (must be <65536)
-				  // turn on CTC mode
+	// turn on CTC mode
 	TCCR1B |= (1 << WGM12);
 	// Set CS12 and CS10 bits for 1024 prescaler
 	TCCR1B |= (1 << CS12) | (1 << CS10);
@@ -115,10 +138,9 @@ void setup()
 
 	sei();//allow interrupts
 
-	start_time = (60 * START_HOUR) + START_MINUTE;
-	stop_time = (60 * STOP_HOUR) + STOP_MINUTE;
 
-	now = rtc.now();
+	
+	
 	LogEvent("Started");
 }
 
@@ -146,8 +168,6 @@ bool CheckIfWeShouldTakePhoto()
 
 	int current_time = (60 * hour) + minute;
 
-	//logTime(now);	
-
 	// check the day - return false if no
 	if (!VALID_DAYS[dayOfWeek]) {
 		return false;
@@ -161,21 +181,18 @@ bool CheckIfWeShouldTakePhoto()
 		}
 	}
 
-	// this is all just debugging crap
 	return true;
 }
 
-//timer1 interrupt 1Hz toggles pin 13 (LED)
-//generates pulse wave of frequency 1Hz/2 = 0.5kHz (takes two cycles for full wave- toggle high then toggle low)
-ISR(TIMER1_COMPA_vect)
+
+void commonTimerFunction()
 {
 	/*
-	Order of checking:
-	Did we reach our interval?
-	Get date and time from RTC
-	Are we taking photos today
-	Are we in a time slot that we are taking pics
-	Did we reach our interval?
+		Did we reach our interval?  (interval)		
+		Get date and time from RTC
+		Are we taking photos today
+		Are we in a time slot that we are taking pics
+		Did we reach our interval?
 	*/
 
 	interval_counter++;
@@ -195,6 +212,13 @@ ISR(TIMER1_COMPA_vect)
 	}
 }
 
+//generates pulse wave of frequency 1Hz/2 = 0.5kHz (takes two cycles for full wave- toggle high then toggle low)
+// copied from examples
+ISR(TIMER1_COMPA_vect)
+{
+	commonTimerFunction();
+}
+
 // Parameter is how long to keep it open/take pic
 void exposure(int duration)
 {
@@ -211,9 +235,7 @@ void exposure(int duration)
 	digitalWrite(shutterPin, LOW);
 	digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
 	digitalWrite(focusPin, LOW);
-
 }
-
 
 void loop()
 {
