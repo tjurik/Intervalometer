@@ -3,11 +3,16 @@
 #include "boards.h"				// identifies the chip/board based on IDE's setting (we use it for logging)
 #include"lib_customization.h"	// edit this file to define the real time clock and any other functionality-controlling parameters
 
-// looks like we can use an NPN transistor - no problem
-// use a 10k resistor?
-// nikon pinout http://www.doc-diy.net/photo/remote_pinout/
-// http://www.instructables.com/id/Nikon-D90-MC-DC2-Remote-Shutter-Hack/?ALLSTEPS
-
+/*
+Configuration:
+--------------
+- delay - before it starts running (optional?)
+- interval (one second to hours)
+- duration of shutter
+- number of photos to take
+- days of the week to take photos
+- Valid time during day (thee is only one of these - though this could get more complex if we wished)
+*/
 
 //////////////////////////////////////////////////////////////
 // GLOBALS
@@ -16,17 +21,17 @@
 //////////////////////////////////////////////////////////////
 
 int		DELAY				= 0;	// delay from when program is started to when it should start taking photos
-int		SHUTTER_TIME		= 155;	// (in milliseconds) I have no idea what this means.  what is the resolution of this? 
-int		INTERVAL			= 2;	// number of seconds to wait between photos  - for 1 minute use 60, one hour use 3600, etc
+int		SHUTTER_TIME		= 750;	// (in milliseconds) I have no idea what this means.  what is the resolution of this? 
+int		INTERVAL			= 5;	// number of seconds to wait between photos  - for 1 minute use 60, one hour use 3600, etc
 int		NUMBER_OF_EXPOSURES = 1;	// number of photos to take for each 'loop'/command to take a photo
 bool	VALID_DAYS[] = {			// true for yes, take photo, false for no - don't take photo
-	false,// sunday
-	true, // monday
-	true, // tuesday
-	true, // wednesday, etc
-	true,
-	false,
-	true
+	false,	// sunday
+	true,	// monday
+	true,	// tuesday
+	true,	// wednesday
+	true,	// thursday
+	true,	// friday
+	true	// satudrday
 };
 
 // Set to all 0 if always take photo
@@ -36,34 +41,21 @@ int START_MINUTE	= 3;	// 0 to 59
 int STOP_HOUR		= 23;	// 0 to 23
 int STOP_MINUTE		= 58;	// 0 to 59
 
+// set these as desired to control the shutter and focus
+const int focusPin		= 2;
+const int shutterPin	= 3;
 //////////////////////////////////////////////////////////////
 // End of user editable settings
 //////////////////////////////////////////////////////////////
-
-const int focusPin = 2;
-const int shutterPin = 3;
 
 DateTime now;
 bool state = false;
 bool newstate = false;
 bool triggerPhoto = false;
 
-// TO DO
-// OPTOCOUPLER _ TO SET THE GROUND AND SHUTTER AND RELEASE
-// http://www.martyncurrey.com/activating-the-shutter-release/
-
-// We can make this more interesting and useful if there are multiple on and off times - 
-// for now we only need one ON time - keep it simple and that was all that was in original request
-
-// Allow a bluetooth or network re-config to change the settings.
-// we could listen on some poert to details
-
-// also allow some logging to a bluetooth phone or internet, or whatever.  Probably not worth the trouble for this little app
-
 int start_time = 0;
 int stop_time = 0;
 int interval_counter = 0;
-
 
 // set the type of clock - the default is no RTC - but set the macro for the one you are using.
 
@@ -78,20 +70,17 @@ RTC_Millis rtc;
 // this is just for logging
 char daysOfTheWeek[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
-void LogEvent(char * str)
+void logEvent(char * str)
 {
 	logTime(now);
+#ifndef _NO_SERIAL
 	Serial.print("  ");
 	Serial.print(BOARD);
 	Serial.print("  ");
 	Serial.print(str);
 	Serial.println();
+#endif
 }
-
-/*
-http://playground.arduino.cc/Main/DS1302
-https://learn.adafruit.com/ds1307-real-time-clock-breakout-board-kit/understanding-the-code
-*/
 
 void setupRTClock()
 {
@@ -116,7 +105,7 @@ void setupCameraPins()
 	// set the focus and shutter pins
 	pinMode(focusPin, OUTPUT);
 	pinMode(shutterPin, OUTPUT);
-	pinMode(13, OUTPUT);    // just for led - nothing important
+	pinMode(13, OUTPUT);    // just for led
 
 	digitalWrite(focusPin, LOW);
 	digitalWrite(shutterPin, LOW);
@@ -128,15 +117,13 @@ void setupIntervalometerSettings()
 	stop_time = (60 * STOP_HOUR) + STOP_MINUTE;
 }
 
-//#if defined(__AVR_Atmega32U4__) // Yun 16Mhz, Micro, Leonardo, Esplora
-
 void setupOneHertzTimer()
 {
 	// Add specific boards/chips here
-	// to keep this part clean we ifdef the code in the function - so no ifdefs in this method
+	// to keep this part clean we ifdef the code in the function so if the board is not defined it just returns/no code to run
 
-	setupAtmega328();		// Uno
-	setupZero();			// Adafruit Feather M0
+	setupAtmega328();		// Uno, etc
+	setupZero();			// e.g. Adafruit Feather M0
 }
 
 void setup()
@@ -145,12 +132,16 @@ void setup()
 	setupCameraPins();
 	setupIntervalometerSettings();
 	setupOneHertzTimer();	
-	LogEvent("Started");
-	LogSettings();
+	logEvent("Started");
+	logSettings();	
 }
 
 void logTime(DateTime now)
 {
+#ifndef _NO_SERIAL  
+	// maybe we can find another way to log?  that is not serial
+	// we should make strings - and log to either oled, usb, serial, BT, etc
+	// refactor code and allow coder to specify logging type(s) when building
 	int dayOfWeek = now.dayOfTheWeek();
 	int hour = now.hour();
 	int minute = now.minute();
@@ -162,6 +153,7 @@ void logTime(DateTime now)
 	if (second < 10)
 		Serial.print("0");
 	Serial.print(second, DEC); Serial.print("  (");	Serial.print(daysOfTheWeek[dayOfWeek]);	Serial.print(") ");
+#endif
 }
 
 bool CheckIfWeShouldTakePhoto()
@@ -178,6 +170,7 @@ bool CheckIfWeShouldTakePhoto()
 		return false;
 	}
 		
+	// now check if we are in the 'active' time slot
 	if (start_time != 0 || stop_time != 0)
 	{
 		if (start_time > current_time || current_time >= stop_time)
@@ -191,14 +184,6 @@ bool CheckIfWeShouldTakePhoto()
 
 void commonTimerFunction()
 {
-	/*
-		Did we reach our interval?  (interval)		
-		Get date and time from RTC
-		Are we taking photos today
-		Are we in a time slot that we are taking pics
-		Did we reach our interval?
-	*/
-
 	interval_counter++;
 	if (interval_counter % INTERVAL == 0) {
 		// reset counter to 0 if we hit our interval % (to make division take less time?)
@@ -210,18 +195,18 @@ void commonTimerFunction()
 	if (newstate != state) {
 		state = newstate;
 		if (state)
-			LogEvent("Transitioned to taking photos");
+			logEvent("Transitioned to taking photos");
 		else
-			LogEvent("Transitioned to NOT taking photos");
+			logEvent("Transitioned to NOT taking photos");
 	}
 }
 
 // Parameter is how long to keep it open/take pic
 void exposure(int duration)
 {
-	// trigger some relay or transistor or optocoupler in the circuit
-	// I think we want focus then shutter - but do they need delay or same time is ok?
-	digitalWrite(focusPin, HIGH);  // do we want a delay between focus and shutter?
+	// Use the pins we set high to control transistor, optocoupler or relay.  Up to the user.
+	// Set focus, then shutter - we may need to delay between focus and then shutter?
+	digitalWrite(focusPin, HIGH);  
 #ifdef _FLASH_LED_ON_TRIGGER 	
 	digitalWrite(LED_BUILTIN, HIGH); 
 #endif
@@ -237,19 +222,10 @@ void exposure(int duration)
 }
  
 void loop()
-{
-	/*
-	Configuration:
-	--------------
-	- delay - before it starts running (optional?)
-	- interval (one second to hours)
-	- duration of shutter
-	- number of photos to take
-	- days of the week to take photos
-	- Valid time during day (thee is only one of these - though this could get more complex if we wished)
-	****NOTE****
-	if you set the interval to some value that will be "overstepped" by the shutter speed and number of exposures then that is user error and we can't help you --		we could do some waerning message though...
-	*/
+{	
+	// ****NOTE****
+	// If you set the interval to some value that will be "overstepped" by the shutter speed and number of exposures then that is user error and we can't help you --		
+	// we could do some warning message though?
 
 	if (triggerPhoto)
 	{
@@ -259,12 +235,17 @@ void loop()
 		}
 		triggerPhoto = false;
 	}
-	// log the transition - we may not need to do this.
-	// we should email this info if possible?		 
+
+
+ #ifdef ARDUINO_AVR_TRINKET3
+    exposure(SHUTTER_TIME);
+ delay(1000);
+ #endif
 }
 
-void LogSettings()
+void logSettings()
 {
+#ifndef _NO_SERIAL
 	Serial.print("Settings\n");
 	Serial.print("-\tInterval (seconds): ");	Serial.print(INTERVAL, DEC); Serial.println();
 	Serial.print("-\tShutter Time (ms):  ");	Serial.print(SHUTTER_TIME, DEC);	 Serial.println();
@@ -296,6 +277,7 @@ void LogSettings()
 	Serial.println();
 	Serial.print("-\tFocus Pin:          ");	Serial.print(focusPin, DEC); Serial.println();
 	Serial.print("-\tShutter Pin:        ");	Serial.print(shutterPin, DEC);	Serial.println();
+#endif
 }
 
 
@@ -308,7 +290,7 @@ where:
 N = timer prescaler
 CC0 = value in the CC0 register
 
-...we can calculate CC0 for a timer frequency of 1Hz.
+we can calculate CC0 for a timer frequency of 1Hz.
 
 So,
 CC0 = (48MHz / 1024) - 1 = 46874 = 0xB71A (hex)

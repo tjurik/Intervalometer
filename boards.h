@@ -67,6 +67,8 @@
 #elif defined(ARDUINO_AVR_YUN)       
 #define BOARD "Yun"
 
+#elif defined(ARDUINO_AVR_TRINKET3)
+#define BOARD "Trinket"
 // These boards must be installed separately:
 #elif defined(ARDUINO_SAM_DUE)       
 #define BOARD "Due"
@@ -76,6 +78,7 @@
 #define BOARD "101"
 #else
 #error "Unknown board"
+//#define BOARD "Unknown board"
 #endif
 
 #endif
