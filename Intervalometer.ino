@@ -1,5 +1,5 @@
+#include <Wire.h>
 #include <RTClib.h>				// a real time clock lib
-
 #include "boards.h"				// identifies the chip/board based on IDE's setting (we use it for logging)
 #include"lib_customization.h"	// edit this file to define the real time clock and any other functionality-controlling parameters
 
@@ -25,7 +25,7 @@ int		SHUTTER_TIME		= 750;	// (in milliseconds) I have no idea what this means.  
 int		INTERVAL			= 5;	// number of seconds to wait between photos  - for 1 minute use 60, one hour use 3600, etc
 int		NUMBER_OF_EXPOSURES = 1;	// number of photos to take for each 'loop'/command to take a photo
 bool	VALID_DAYS[] = {			// true for yes, take photo, false for no - don't take photo
-	false,	// sunday
+	true,	// sunday
 	true,	// monday
 	true,	// tuesday
 	true,	// wednesday
@@ -42,8 +42,8 @@ int STOP_HOUR		= 23;	// 0 to 23
 int STOP_MINUTE		= 58;	// 0 to 59
 
 // set these as desired to control the shutter and focus
-const int focusPin		= 2;
-const int shutterPin	= 3;
+const int focusPin		= 4;
+const int shutterPin	= 5;
 //////////////////////////////////////////////////////////////
 // End of user editable settings
 //////////////////////////////////////////////////////////////
@@ -86,16 +86,10 @@ void setupRTClock()
 {
 	// https://learn.adafruit.com/ds1307-real-time-clock-breakout-board-kit/arduino-library
 	// conditional compilation depending on RTC we are using
-#ifdef _RTC_DS3231_	
-	//if (!rtc.begin()) {		
-	//Serial.println("RTC is NOT running!");	
-	//rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-#elif _RTC_DS1307
 
-#else
-	rtc.begin(DateTime(F(__DATE__), F(__TIME__)));  // use this for the millis - not for the other chip
-#endif
-
+	setupRTC3231();
+	setupRTC1307();
+	setupRTCMillis();
 	// first call to set the time
 	now = rtc.now();
 }
@@ -109,6 +103,42 @@ void setupCameraPins()
 
 	digitalWrite(focusPin, LOW);
 	digitalWrite(shutterPin, LOW);
+}
+
+void setupRTC1307()
+{
+}
+
+
+void setupRTCMillis()
+{
+#ifdef _RTC_MILLIS
+	rtc.begin(DateTime(F(__DATE__), F(__TIME__)));  // use this for the millis - not for the other chip
+#endif
+}
+
+void setupRTC3231()
+{
+#ifdef _RTC_DS3231_	
+#ifndef ESP8266
+	//while (!Serial); // for Leonardo/Micro/Zero
+#endif
+
+	Serial.begin(9600);
+
+	delay(1000); // wait for console opening
+
+	if (!rtc.begin()) {
+		Serial.println("Couldn't find RTC");
+		//while (1);
+	}
+
+	if (rtc.lostPower()) {
+		Serial.println("RTC lost power, lets set the time!");
+		// following line sets the RTC to the date & time this sketch was compiled
+		rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+	}
+#endif
 }
 
 void setupIntervalometerSettings()
@@ -227,6 +257,15 @@ void loop()
 	// If you set the interval to some value that will be "overstepped" by the shutter speed and number of exposures then that is user error and we can't help you --		
 	// we could do some warning message though?
 
+#ifdef ARDUINO_AVR_FEATHER32U4
+//triggerPhoto = true;
+#endif
+ #ifdef ARDUINO_AVR_TRINKET3
+ //triggerPhoto = true;
+ #endif
+ //delay(1000);
+ 
+
 	if (triggerPhoto)
 	{
 		for (int i = 0; i < NUMBER_OF_EXPOSURES; i++)
@@ -237,10 +276,6 @@ void loop()
 	}
 
 
- #ifdef ARDUINO_AVR_TRINKET3
-    exposure(SHUTTER_TIME);
- delay(1000);
- #endif
 }
 
 void logSettings()

@@ -77,8 +77,8 @@
 #elif defined(ARDUINO_ARC32_TOOLS)       
 #define BOARD "101"
 #else
-#error "Unknown board"
-//#define BOARD "Unknown board"
+//#error "Unknown board"
+#define BOARD "Unknown board"
 #endif
 
 #endif
