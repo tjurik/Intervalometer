@@ -1,5 +1,4 @@
 # Invervalometer
-(current only works for ATmega328P)
 Arduino based intervalometer for time lapse photography
 
 Arduino based Intervalometer project.  There are a number of projects on the internets that provide this functionality but I wanted to add settings tor days and time periods in addition to a more traditional time lapse interval.
@@ -30,7 +29,7 @@ Future Functionality
 
 Current hardware
 
-- Arduino Uno (includes adafruit pro trinket and metro min)  Support for other hardware not available yet until we make the interrup/timer code platform agnostic
+- ATmega328P/Arduino Uno (includes adafruit pro trinket and metro mini)  
 - Nikon 5100
 
 Optional Hardware
@@ -42,7 +41,7 @@ Optional Hardware
 
 Planned hardware support
 
-- Adafruit Feather M0
+- Adafruit Feather M0 (Support added, working!)
 
 Electronics
 
