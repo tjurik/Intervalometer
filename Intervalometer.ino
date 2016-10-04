@@ -21,8 +21,8 @@ Configuration:
 //////////////////////////////////////////////////////////////
 
 int		DELAY				= 0;	// delay from when program is started to when it should start taking photos
-int		SHUTTER_TIME		= 750;	// (in milliseconds) I have no idea what this means.  what is the resolution of this? 
-int		INTERVAL			= 5;	// number of seconds to wait between photos  - for 1 minute use 60, one hour use 3600, etc
+int		SHUTTER_TIME		= 500;	// (in milliseconds) I have no idea what this means.  what is the resolution of this? 
+int		INTERVAL			= 4;	// number of seconds to wait between photos  - for 1 minute use 60, one hour use 3600, etc
 int		NUMBER_OF_EXPOSURES = 1;	// number of photos to take for each 'loop'/command to take a photo
 bool	VALID_DAYS[] = {			// true for yes, take photo, false for no - don't take photo
 	true,	// sunday
@@ -42,8 +42,8 @@ int STOP_HOUR		= 23;	// 0 to 23
 int STOP_MINUTE		= 58;	// 0 to 59
 
 // set these as desired to control the shutter and focus
-const int focusPin		= 4;
-const int shutterPin	= 5;
+const int focusPin		= 13;
+const int shutterPin	= 13;
 //////////////////////////////////////////////////////////////
 // End of user editable settings
 //////////////////////////////////////////////////////////////
@@ -71,9 +71,9 @@ RTC_Millis rtc;
 char daysOfTheWeek[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
 void logEvent(char * str)
-{
-	logTime(now);
+{	
 #ifndef _NO_SERIAL
+	logTime();
 	Serial.print("  ");
 	Serial.print(BOARD);
 	Serial.print("  ");
@@ -109,7 +109,6 @@ void setupRTC1307()
 {
 }
 
-
 void setupRTCMillis()
 {
 #ifdef _RTC_MILLIS
@@ -119,26 +118,7 @@ void setupRTCMillis()
 
 void setupRTC3231()
 {
-#ifdef _RTC_DS3231_	
-#ifndef ESP8266
-	//while (!Serial); // for Leonardo/Micro/Zero
-#endif
 
-	Serial.begin(9600);
-
-	delay(1000); // wait for console opening
-
-	if (!rtc.begin()) {
-		Serial.println("Couldn't find RTC");
-		//while (1);
-	}
-
-	if (rtc.lostPower()) {
-		Serial.println("RTC lost power, lets set the time!");
-		// following line sets the RTC to the date & time this sketch was compiled
-		rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-	}
-#endif
 }
 
 void setupIntervalometerSettings()
@@ -164,6 +144,11 @@ void setup()
 	setupOneHertzTimer();	
 	logEvent("Started");
 	logSettings();	
+}
+
+void logTime() {
+	DateTime theTime = rtc.now();
+	logTime(theTime);
 }
 
 void logTime(DateTime now)
@@ -214,6 +199,10 @@ bool CheckIfWeShouldTakePhoto()
 
 void commonTimerFunction()
 {
+#ifdef _DEBUG_TICK
+	logEvent("Tick");
+#endif
+
 	interval_counter++;
 	if (interval_counter % INTERVAL == 0) {
 		// reset counter to 0 if we hit our interval % (to make division take less time?)
@@ -228,7 +217,7 @@ void commonTimerFunction()
 			logEvent("Transitioned to taking photos");
 		else
 			logEvent("Transitioned to NOT taking photos");
-	}
+	} 
 }
 
 // Parameter is how long to keep it open/take pic
@@ -248,6 +237,9 @@ void exposure(int duration)
 	digitalWrite(focusPin, LOW);
 #ifdef _FLASH_LED_ON_TRIGGER
 	digitalWrite(LED_BUILTIN, LOW); 
+#endif
+#ifdef _DEBUG_EXPOSURE
+  logEvent("Exposed");
 #endif
 }
  
@@ -274,8 +266,6 @@ void loop()
 		}
 		triggerPhoto = false;
 	}
-
-
 }
 
 void logSettings()
@@ -315,23 +305,7 @@ void logSettings()
 #endif
 }
 
-
-/*
-The code puts timer TC4 into match frequency (MFRQ) mode. In this mode the timer counts up to the value in the CC0 register before overflowing and resetting the timer back to 0.
-I've set the generic clock 4 (GCLK4) to 48MHz and the timer prescaler to 1024. Therefore the timer's being clocked at 46.875kHz.
-Using the formula:
-timer frequency = generic clock frequency / (N * (CC0 + 1))
-where:
-N = timer prescaler
-CC0 = value in the CC0 register
-
-we can calculate CC0 for a timer frequency of 1Hz.
-
-So,
-CC0 = (48MHz / 1024) - 1 = 46874 = 0xB71A (hex)
-This will cause the timer to overflow every second.
-*/
-
+// from https://forums.adafruit.com/viewtopic.php?f=57&t=103936
 // Set timer TC4 to call the TC4_Handler every second
 void setupZero()
 {
@@ -382,10 +356,7 @@ void TC4_Handler()                              // Interrupt Service Routine (IS
 	if (TC4->COUNT16.INTFLAG.bit.OVF && TC4->COUNT16.INTENSET.bit.OVF)
 	{
 		// Put your timer overflow (OVF) code here:     
-		// ...
-		
 		commonTimerFunction();
-		
 		REG_TC4_INTFLAG = TC_INTFLAG_OVF;         // Clear the OVF interrupt flag
 	}
 }
