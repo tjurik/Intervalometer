@@ -321,11 +321,7 @@ void setupAtmega328()
 {
 #ifdef __AVR_ATmega328P__
 	
-	//traceDebug("setupAtmega328() entry");
-
 	cli();  // stop interrupts
-	
-
 			//set timer1 interrupt at 1Hz
 	TCCR1A = 0;// set entire TCCR1A register to 0
 	TCCR1B = 0;// same for TCCR1B
@@ -339,9 +335,7 @@ void setupAtmega328()
 	// enable timer compare interrupt
 	TIMSK1 |= (1 << OCIE1A);
 	
-	sei();//allow interrupts	
-	//traceDebug("setupAtmega328() 3");
-	
+	sei();//allow interrupts			
 #endif
 }
 
@@ -421,10 +415,7 @@ void setupIntervalometerSettings()
 void setupOneHertzTimer()
 {
 	// Add specific boards/chips here
-	// to keep this part clean we ifdef the code in the function so if the board is not defined it just returns/no code to run
-	//traceDebug("setupOneHertzTimer() - entry");
+	// to keep this part clean we ifdef the code in the function so if the board is not defined it just returns/no code to run	
 	setupAtmega328();		// Uno, etc
-	//traceDebug("setupOneHertzTimer() - 2");
-	setupZero();			// e.g. Adafruit Feather M0
-	//traceDebug("setupOneHertzTimer() - 3");
+	setupZero();			// e.g. Adafruit Feather M0	
 }
