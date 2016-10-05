@@ -3,10 +3,10 @@
 // put the #defines/macros in here
 // set the real time clock, anything else
 
-#define _DEBUG_TICK
+//#define _DEBUG_TICK
 #define _DEBUG_EXPOSURE
 #define _FLASH_LED_ON_TRIGGER
-#define _TRACE
+//#define _TRACE
 
 #define _RTC_DS3231
 //#define _RTC_MILLIS

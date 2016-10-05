@@ -170,7 +170,7 @@ bool CheckIfWeShouldTakePhoto()
 void commonTimerFunction()
 {
 #ifdef _DEBUG_TICK
-	logEvent("Tick");
+	//logEvent("Tick");
 #endif
 
 	interval_counter++;
@@ -321,10 +321,10 @@ void setupAtmega328()
 {
 #ifdef __AVR_ATmega328P__
 	
-	traceDebug("setupAtmega328() entry");
+	//traceDebug("setupAtmega328() entry");
 
 	cli();  // stop interrupts
-	traceDebug("setupAtmega328() 1");
+	
 
 			//set timer1 interrupt at 1Hz
 	TCCR1A = 0;// set entire TCCR1A register to 0
@@ -338,9 +338,9 @@ void setupAtmega328()
 	TCCR1B |= (1 << CS12) | (1 << CS10);
 	// enable timer compare interrupt
 	TIMSK1 |= (1 << OCIE1A);
-	traceDebug("setupAtmega328() 2");
+	
 	sei();//allow interrupts	
-	traceDebug("setupAtmega328() 3");
+	//traceDebug("setupAtmega328() 3");
 	
 #endif
 }
@@ -422,9 +422,9 @@ void setupOneHertzTimer()
 {
 	// Add specific boards/chips here
 	// to keep this part clean we ifdef the code in the function so if the board is not defined it just returns/no code to run
-	traceDebug("setupOneHertzTimer() - entry");
+	//traceDebug("setupOneHertzTimer() - entry");
 	setupAtmega328();		// Uno, etc
-	traceDebug("setupOneHertzTimer() - 2");
+	//traceDebug("setupOneHertzTimer() - 2");
 	setupZero();			// e.g. Adafruit Feather M0
-	traceDebug("setupOneHertzTimer() - 3");
+	//traceDebug("setupOneHertzTimer() - 3");
 }
