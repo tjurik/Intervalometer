@@ -42,8 +42,8 @@ int STOP_HOUR		= 23;	// 0 to 23
 int STOP_MINUTE		= 58;	// 0 to 59
 
 // set these as desired to control the shutter and focus
-const int focusPin		= 13;
-const int shutterPin	= 13;
+const int focusPin		= 6;
+const int shutterPin	= 7;
 //////////////////////////////////////////////////////////////
 // End of user editable settings
 //////////////////////////////////////////////////////////////
@@ -59,7 +59,7 @@ int interval_counter = 0;
 
 // set the type of clock - the default is no RTC - but set the macro for the one you are using.
 
-#ifdef _RTC_DS3231_
+#ifdef _RTC_DS3231
 RTC_DS3231 rtc; 
 #elif _RTC_DS1307
 RTC_DS1307 rtc;
@@ -67,108 +67,78 @@ RTC_DS1307 rtc;
 RTC_Millis rtc;
 #endif
 
-// this is just for logging
+// just for logging
 char daysOfTheWeek[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
-void logEvent(char * str)
-{	
-#ifndef _NO_SERIAL
-	logTime();
-	Serial.print("  ");
-	Serial.print(BOARD);
-	Serial.print("  ");
-	Serial.print(str);
-	Serial.println();
-#endif
-}
 
-void setupRTClock()
+void traceDebug(char* s)
 {
-	// https://learn.adafruit.com/ds1307-real-time-clock-breakout-board-kit/arduino-library
-	// conditional compilation depending on RTC we are using
-
-	setupRTC3231();
-	setupRTC1307();
-	setupRTCMillis();
-	// first call to set the time
-	now = rtc.now();
-}
-
-void setupCameraPins()
-{
-	// set the focus and shutter pins
-	pinMode(focusPin, OUTPUT);
-	pinMode(shutterPin, OUTPUT);
-	pinMode(13, OUTPUT);    // just for led
-
-	digitalWrite(focusPin, LOW);
-	digitalWrite(shutterPin, LOW);
-}
-
-void setupRTC1307()
-{
-}
-
-void setupRTCMillis()
-{
-#ifdef _RTC_MILLIS
-	rtc.begin(DateTime(F(__DATE__), F(__TIME__)));  // use this for the millis - not for the other chip
+#ifdef _TRACE
+	Serial.print("TRACE - ");
+	Serial.print(s);
+	Serial.print("\n");
+	delay(222);  // just so we can finish the printing?
 #endif
 }
 
 void setupRTC3231()
 {
+	traceDebug("setupRTC3231()");
 
-}
+#ifndef ESP8266
+	while (!Serial); // for Leonardo/Micro/Zero
+#endif
 
-void setupIntervalometerSettings()
-{
-	start_time = (60 * START_HOUR) + START_MINUTE;
-	stop_time = (60 * STOP_HOUR) + STOP_MINUTE;
-}
+	Serial.begin(9600);
 
-void setupOneHertzTimer()
-{
-	// Add specific boards/chips here
-	// to keep this part clean we ifdef the code in the function so if the board is not defined it just returns/no code to run
+	delay(3000); // wait for console opening
 
-	setupAtmega328();		// Uno, etc
-	setupZero();			// e.g. Adafruit Feather M0
+	if (!rtc.begin()) {
+		Serial.println("Couldn't find RTC");
+		while (1);
+	}
+
+	if (rtc.lostPower()) {
+		Serial.println("RTC lost power, lets set the time!");
+		// following line sets the RTC to the date & time this sketch was compiled
+		rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+		// This line sets the RTC with an explicit date & time, for example to set
+		// January 21, 2014 at 3am you would call:
+		// rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+	}
 }
 
 void setup()
-{	
+{
+//	Serial.begin(9600);
+//	Wire.begin();
+	setupOneHertzTimer();		
 	setupRTClock();
 	setupCameraPins();
 	setupIntervalometerSettings();
-	setupOneHertzTimer();	
 	logEvent("Started");
-	logSettings();	
+	logSettings(); 
+}
+
+void loop()
+{
+	// ****NOTE****
+	// If you set the interval to some value that will be "overstepped" by the shutter speed and number of exposures then that is user error and we can't help you --		
+	// we could do some warning message though?
+
+	if (triggerPhoto)
+	{
+		for (int i = 0; i < NUMBER_OF_EXPOSURES; i++)
+		{
+			exposure(SHUTTER_TIME);
+		}
+		triggerPhoto = false;
+	}	
 }
 
 void logTime() {
 	DateTime theTime = rtc.now();
 	logTime(theTime);
-}
-
-void logTime(DateTime now)
-{
-#ifndef _NO_SERIAL  
-	// maybe we can find another way to log?  that is not serial
-	// we should make strings - and log to either oled, usb, serial, BT, etc
-	// refactor code and allow coder to specify logging type(s) when building
-	int dayOfWeek = now.dayOfTheWeek();
-	int hour = now.hour();
-	int minute = now.minute();
-	int second = now.second();
-	Serial.print(now.year(), DEC);	Serial.print('/');	Serial.print(now.month(), DEC);	Serial.print('/');	Serial.print(now.day(), DEC); Serial.print("  ");	Serial.print(hour, DEC);	Serial.print(':');
-	if (minute < 10)
-		Serial.print("0");
-	Serial.print(minute, DEC);	Serial.print(':');
-	if (second < 10)
-		Serial.print("0");
-	Serial.print(second, DEC); Serial.print("  (");	Serial.print(daysOfTheWeek[dayOfWeek]);	Serial.print(") ");
-#endif
 }
 
 bool CheckIfWeShouldTakePhoto()
@@ -243,31 +213,6 @@ void exposure(int duration)
 #endif
 }
  
-void loop()
-{	
-	// ****NOTE****
-	// If you set the interval to some value that will be "overstepped" by the shutter speed and number of exposures then that is user error and we can't help you --		
-	// we could do some warning message though?
-
-#ifdef ARDUINO_AVR_FEATHER32U4
-//triggerPhoto = true;
-#endif
- #ifdef ARDUINO_AVR_TRINKET3
- //triggerPhoto = true;
- #endif
- //delay(1000);
- 
-
-	if (triggerPhoto)
-	{
-		for (int i = 0; i < NUMBER_OF_EXPOSURES; i++)
-		{
-			exposure(SHUTTER_TIME);
-		}
-		triggerPhoto = false;
-	}
-}
-
 void logSettings()
 {
 #ifndef _NO_SERIAL
@@ -375,8 +320,11 @@ ISR(TIMER1_COMPA_vect)
 void setupAtmega328()
 {
 #ifdef __AVR_ATmega328P__
+	
+	traceDebug("setupAtmega328() entry");
 
 	cli();  // stop interrupts
+	traceDebug("setupAtmega328() 1");
 
 			//set timer1 interrupt at 1Hz
 	TCCR1A = 0;// set entire TCCR1A register to 0
@@ -390,7 +338,93 @@ void setupAtmega328()
 	TCCR1B |= (1 << CS12) | (1 << CS10);
 	// enable timer compare interrupt
 	TIMSK1 |= (1 << OCIE1A);
-
+	traceDebug("setupAtmega328() 2");
 	sei();//allow interrupts	
+	traceDebug("setupAtmega328() 3");
+	
 #endif
+}
+
+
+void logTime(DateTime now)
+{
+#ifndef _NO_SERIAL  
+	// maybe we can find another way to log?  that is not serial
+	// we should make strings - and log to either oled, usb, serial, BT, etc
+	// refactor code and allow coder to specify logging type(s) when building
+	int dayOfWeek = now.dayOfTheWeek();
+	int hour = now.hour();
+	int minute = now.minute();
+	int second = now.second();
+	Serial.print(now.year(), DEC);	Serial.print('/');	Serial.print(now.month(), DEC);	Serial.print('/');	Serial.print(now.day(), DEC); Serial.print("  ");	Serial.print(hour, DEC);	Serial.print(':');
+	if (minute < 10)
+		Serial.print("0");
+	Serial.print(minute, DEC);	Serial.print(':');
+	if (second < 10)
+		Serial.print("0");
+	Serial.print(second, DEC); Serial.print("  (");	Serial.print(daysOfTheWeek[dayOfWeek]);	Serial.print(") ");
+#endif
+}
+
+void logEvent(char * str)
+{
+#ifndef _NO_SERIAL
+	logTime();
+	Serial.print("  ");
+	Serial.print(BOARD);
+	Serial.print("  ");
+	Serial.print(str);
+	Serial.println();
+#endif
+}
+
+void setupCameraPins()
+{
+	// set the focus and shutter pins
+	pinMode(focusPin, OUTPUT);
+	pinMode(shutterPin, OUTPUT);
+	pinMode(13, OUTPUT);    // just for led
+
+	digitalWrite(focusPin, LOW);
+	digitalWrite(shutterPin, LOW);
+}
+
+void setupRTClock()
+{
+	// https://learn.adafruit.com/ds1307-real-time-clock-breakout-board-kit/arduino-library
+	// conditional compilation depending on RTC we are using
+
+	setupRTC3231();
+	setupRTC1307();
+	setupRTCMillis();
+	// first call to set the time
+	now = rtc.now();
+}
+
+void setupRTCMillis()
+{
+#ifdef _RTC_MILLIS
+	rtc.begin(DateTime(F(__DATE__), F(__TIME__)));  // use this for the millis - not for the other chip
+#endif
+}
+
+void setupRTC1307()
+{
+}
+
+void setupIntervalometerSettings()
+{
+	start_time = (60 * START_HOUR) + START_MINUTE;
+	stop_time = (60 * STOP_HOUR) + STOP_MINUTE;
+}
+
+void setupOneHertzTimer()
+{
+	// Add specific boards/chips here
+	// to keep this part clean we ifdef the code in the function so if the board is not defined it just returns/no code to run
+	traceDebug("setupOneHertzTimer() - entry");
+	setupAtmega328();		// Uno, etc
+	traceDebug("setupOneHertzTimer() - 2");
+	setupZero();			// e.g. Adafruit Feather M0
+	traceDebug("setupOneHertzTimer() - 3");
 }
