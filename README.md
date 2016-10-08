@@ -8,6 +8,7 @@ Original code is for Arduino Uno, but will eventually allow for compiling agains
 Development environment
 
 - Visual Studio 2015 with Visual Micro (Arduino IDE V 1.6)
+- Arduino IDE 1.6.11 compiles and uploads successfully
 
 Libraries
 
@@ -26,7 +27,7 @@ Current hardware
 
 - ATmega328P/Arduino Uno (includes adafruit pro trinket and metro mini)  
 - Real time clock DS3231  (https://learn.adafruit.com/adafruit-ds3231-precision-rtc-breakout/overview)
-- Nikon 5100
+- Nikon 5100 (you can modify as needed to your camera)
 
 Future Functionality
 
@@ -35,9 +36,9 @@ Future Functionality
 - Upload photos to some where
 - support other boards/processors and RTCs
 
-Electronics
+Electronics components
 
-- It may be possible to use 2N2222 or PN2222 transistors, but I think we will use optocouplers
+- See wiki for details about what transistors and resistors are needed
 - Camera remote controller - for Nikon 5100 it is MC-DC2 
 
 Configuration
