@@ -9,6 +9,7 @@
 //#define _TRACE
 
 #define _RTC_DS3231
+//#define _RTC_1307
 //#define _RTC_MILLIS
 
 // there might be many others - but for now I am only testing with trinket
@@ -21,3 +22,7 @@
 #define _NO_SERIAL
 #endif
 */
+
+#ifdef _RTC_DS3231
+#define _RTC
+#endif
