@@ -78,9 +78,9 @@ char daysOfTheWeek[7][12] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 
 void setup()
 {
-	pinMode(rtcTimerIntPin, INPUT);
-	attachInterrupt(rtcTimerIntPin, rtc_interrupt, RISING);
 	setupRTClock();	
+	pinMode(rtcTimerIntPin, INPUT);
+	attachInterrupt(rtcTimerIntPin, rtc_interrupt, RISING);	
 	setupCameraPins();
 	setupIntervalometerSettings();
 	logEvent("Started");
@@ -97,7 +97,7 @@ void loop()
 	// Since I could not get the 1hz square wave to work, we cheat in the loop and check the time.  
 	// If we're not doing much work it's no big deal, but it would be better to have the ISR/trigger...
 	static unsigned long previousTime = 0;	
-	time_t timeNow = gRTC.get();	 
+	time_t timeNow = RTC.get();	 
 
 	if (timeNow != previousTime) {
 		commonTimerFunction();
@@ -127,13 +127,13 @@ void traceDebug(char* s)
 void setupRTC3231()
 {		
 	Serial.begin(9600);
-	setSyncProvider(gRTC.get);   // the function to get the time from the RTC
+	setSyncProvider(RTC.get);   // the function to get the time from the RTC
 	if (timeStatus() != timeSet)
 		Serial.println("Unable to sync with the RTC");
 	else
 		Serial.println("RTC has set the system time");
 
-	bool stopped = gRTC.oscStopped();
+	bool stopped = RTC.oscStopped();
 	
 	if (stopped || gForceClockSet)
 	{
@@ -170,7 +170,7 @@ void logTime() {
 
 bool CheckIfWeShouldTakePhoto()
 {	
-	time_t theTime = gRTC.get();
+	time_t theTime = RTC.get();
 	int dayOfWeek = weekday(theTime) - 1;
 	int theHour = hour(theTime);
 	int theMinute = minute(theTime);
@@ -454,7 +454,7 @@ void setup3231OneHzTimer()
 	// http://arduino.stackexchange.com/questions/29873/how-to-set-up-one-second-interrupt-isr-for-ds3231-rtc/29881#29881
 	
 	logEvent("Setting RTC timer pin"); 		
-	gRTC.squareWave(SQWAVE_1_HZ);
+	RTC.squareWave(SQWAVE_1_HZ);
 }
 
 void rtc_interrupt(void)
