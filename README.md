@@ -47,3 +47,8 @@ To set up the code to compile and use the right settings for your board you need
 You can control a led indicator with 
 <pre>#define _FLASH_LED_ON_TRIGGER</pre>
 
+
+The first time you compile/run, set this flag to truw
+  bool gForceClockSet = true;  
+ Once the clock is set then change that flag to false.  
+
